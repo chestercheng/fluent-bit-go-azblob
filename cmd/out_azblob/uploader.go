@@ -35,18 +35,15 @@ type Entry struct {
 type Func func() error
 
 type AzblobUploader struct {
-	Entries             chan Entry
-	container           azblob.ContainerURL
-	autoCreateContainer bool
-	objectKeyFormat     string
-	storeAs             FileFormat
-	batchWait           time.Duration
-	batchLimitSize      uint64
-	attempts            *uint64
-	quit                chan struct{}
-	once                sync.Once
-	wg                  sync.WaitGroup
-	logger              *logrus.Entry
+	Entries    chan Entry
+	batches    map[string]*Batch
+	container  azblob.ContainerURL
+	timeTicker *time.Ticker
+	quit       chan struct{}
+	once       sync.Once
+	wg         sync.WaitGroup
+	config     *AzblobConfig
+	logger     *logrus.Entry
 }
 
 func NewUploader(c *AzblobConfig, l *logrus.Entry) (*AzblobUploader, error) {
@@ -54,17 +51,19 @@ func NewUploader(c *AzblobConfig, l *logrus.Entry) (*AzblobUploader, error) {
 	// pipeline to make requests.
 	p := azblob.NewPipeline(c.Credential, azblob.PipelineOptions{})
 
+	checkInterval := c.BatchWait / 10
+	if checkInterval < MinCheckInterval {
+		checkInterval = MinCheckInterval
+	}
+
 	u := &AzblobUploader{
-		Entries:             make(chan Entry),
-		container:           azblob.NewContainerURL(*c.ContainerURL, p),
-		autoCreateContainer: c.AutoCreateContainer,
-		objectKeyFormat:     c.ObjectKeyFormat,
-		storeAs:             c.StoreAs,
-		batchWait:           c.BatchWait,
-		batchLimitSize:      c.BatchLimitSize,
-		attempts:            c.BatchRetryLimit,
-		quit:                make(chan struct{}),
-		logger:              l,
+		Entries:    make(chan Entry),
+		batches:    map[string]*Batch{},
+		container:  azblob.NewContainerURL(*c.ContainerURL, p),
+		timeTicker: time.NewTicker(checkInterval),
+		quit:       make(chan struct{}),
+		config:     c,
+		logger:     l,
 	}
 
 	u.wg.Add(1)
@@ -74,16 +73,8 @@ func NewUploader(c *AzblobConfig, l *logrus.Entry) (*AzblobUploader, error) {
 }
 
 func (u *AzblobUploader) start() {
-	batches := map[string]*Batch{}
-
-	checkInterval := u.batchWait / 10
-	if checkInterval < MinCheckInterval {
-		checkInterval = MinCheckInterval
-	}
-	timeTicker := time.NewTicker(checkInterval)
-
 	defer func() {
-		for ts, b := range batches {
+		for ts, b := range u.batches {
 			u.sendBatch(ts, b.Buffer)
 		}
 
@@ -94,32 +85,32 @@ func (u *AzblobUploader) start() {
 		select {
 		case <-u.quit:
 			return
-		case <-timeTicker.C:
-			for ts, b := range batches {
-				if time.Since(b.CreatedAt) < u.batchWait {
+		case <-u.timeTicker.C:
+			for ts, b := range u.batches {
+				if time.Since(b.CreatedAt) < u.config.BatchWait {
 					continue
 				}
 
 				u.logger.Debug("max wait time reached, sending batch...")
 				go u.sendBatch(ts, b.Buffer)
-				delete(batches, ts)
+				delete(u.batches, ts)
 			}
 		case e := <-u.Entries:
-			batch, ok := batches[e.TimeSlice]
+			batch, ok := u.batches[e.TimeSlice]
 
 			if !ok {
-				batches[e.TimeSlice] = &Batch{
+				u.batches[e.TimeSlice] = &Batch{
 					Buffer:    e.Raw,
 					CreatedAt: time.Now(),
 				}
 				break
 			}
 
-			if uint64(len(batch.Buffer)) > u.batchLimitSize {
+			if uint64(len(batch.Buffer)) > u.config.BatchLimitSize {
 				u.logger.Debug("max size reached, sending batch...")
 				go u.sendBatch(e.TimeSlice, batch.Buffer)
 
-				batches[e.TimeSlice] = &Batch{
+				u.batches[e.TimeSlice] = &Batch{
 					Buffer:    e.Raw,
 					CreatedAt: time.Now(),
 				}
@@ -139,7 +130,7 @@ func (u *AzblobUploader) Stop() {
 
 func (u *AzblobUploader) sendBatch(timeSlice string, b []byte) {
 	// Generate ObjectKey
-	objectKey := u.objectKeyFormat
+	objectKey := u.config.ObjectKeyFormat
 	objectKey = strings.ReplaceAll(objectKey, "%{hostname}", Hostname)
 	objectKey = strings.ReplaceAll(objectKey, "%{uuid}", uuid.NewV4().String())
 	objectKey = strings.ReplaceAll(objectKey, "%{time_slice}", timeSlice)
@@ -148,8 +139,8 @@ func (u *AzblobUploader) sendBatch(timeSlice string, b []byte) {
 
 	var buf []byte
 	var err error
-	err = retry(u.attempts, func() error {
-		switch u.storeAs {
+	err = retry(u.config.BatchRetryLimit, func() error {
+		switch u.config.StoreAs {
 		case GzipFormat:
 			buf, err = makeGzip(b)
 			if err != nil {
@@ -216,7 +207,7 @@ func (u *AzblobUploader) upload(objectKey string, b []byte) error {
 		context.Background(), Timeout*time.Second)
 	defer cancel()
 
-	if u.autoCreateContainer {
+	if u.config.AutoCreateContainer {
 		err := u.ensureContainer(ctx)
 		if err != nil {
 			return err

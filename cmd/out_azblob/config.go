@@ -42,7 +42,7 @@ type AzblobConfig struct {
 	LogLevel            logrus.Level
 }
 
-func NewConfig(c *FLBPluginConfig) (*AzblobConfig, error) {
+func NewConfig(c PluginConfig) (*AzblobConfig, error) {
 	var err error
 
 	cfg := &AzblobConfig{}

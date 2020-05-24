@@ -20,6 +20,10 @@ var (
 	logger    *logrus.Entry
 )
 
+type PluginConfig interface {
+	Get(key string) string
+}
+
 type FLBPluginConfig struct {
 	ctx unsafe.Pointer
 }
@@ -167,6 +171,7 @@ func FLBPluginFlushCtx(ctx, data unsafe.Pointer, length C.int, tag *C.char) int 
 		default:
 			operator.logger.Warn(
 				"timestamp isn't known format. Use current time")
+			timestamp = time.Now()
 		}
 
 		err := operator.SendRecord(record, timestamp)

@@ -1,0 +1,4 @@
+.env
+out_azblob.h
+out_azblob.so
+coverage.out
