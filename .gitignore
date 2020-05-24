@@ -1,4 +1,4 @@
 .env
-out_azblob.h
-out_azblob.so
+out_azblob_*.h
+out_azblob_*.so
 coverage.out

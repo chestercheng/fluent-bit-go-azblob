@@ -1,5 +1,7 @@
 # fluent-bit Azure Blob output plugin
 
+[![Build Status](https://cloud.drone.io/api/badges/chestercheng/fluent-bit-go-azblob/status.svg)](https://cloud.drone.io/chestercheng/fluent-bit-go-azblob)
+
 Azure Blob output plugin buffers logs in local file and upload them to Azure Blob periodically.
 This plugin is porting from [fluent-bit-go-s3](https://github.com/cosmo0920/fluent-bit-go-s3).
 

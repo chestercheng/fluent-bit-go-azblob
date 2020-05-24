@@ -24,19 +24,11 @@ vet:
 	$(GO) vet $(PACKAGES)
 
 
-OS ?=
-ARCH ?= amd64
+GOOS ?= $(shell uname -s | tr '[:upper:]' '[:lower:]')
+GOARCH ?= amd64
 .PHONY: build
 build:
-ifeq ($(OS), linux)
-	@docker run --rm \
-	  -e CGO_ENABLED=1 -e GOOS=$(OS) -e GOARCH=$(ARCH) \
-	  -v ${PWD}:/fluent-bit-go-azblob -w /fluent-bit-go-azblob \
-	  golang:1.14-buster \
-	  make
-else
-	$(GO) build $(GO_FLAGS) -buildmode=c-shared -o out_azblob.so $(SOURCES)
-endif
+	$(GO) build $(GO_FLAGS) -buildmode=c-shared -o out_azblob_$(GOOS)_$(GOARCH).so $(SOURCES)
 
 
 test:

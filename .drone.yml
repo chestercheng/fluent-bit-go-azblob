@@ -1,0 +1,35 @@
+---
+kind: pipeline
+name: build
+
+platform:
+  os: linux
+  arch: amd64
+
+steps:
+- name: vet
+  pull: always
+  image: golang:1.14
+  commands:
+  - make vet
+  volumes:
+  - name: gopath
+    path: /go
+
+- name: build
+  pull: always
+  image: golang:1.14
+  commands:
+  - make
+  volumes:
+  - name: gopath
+    path: /go
+
+- name: publish
+  image: plugins/github-release
+  settings:
+    api_key:
+      from_secret: github_release_api_key
+    files: "*.so"
+  when:
+    event: tag

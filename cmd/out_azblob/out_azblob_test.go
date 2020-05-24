@@ -5,12 +5,12 @@ import (
 	"compress/gzip"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
 	"testing"
 	"time"
-	"errors"
 
 	"github.com/joho/godotenv"
 	"github.com/sirupsen/logrus"
@@ -164,7 +164,7 @@ func TestRetry(t *testing.T) {
 	})
 
 	assert.Error(t, err)
-	assert.Equal(t, attempts + 1, count)
+	assert.Equal(t, attempts+1, count)
 
 }
 
