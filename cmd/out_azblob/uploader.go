@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/Azure/azure-storage-blob-go/azblob"
-	"github.com/satori/go.uuid"
+	uuid "github.com/satori/go.uuid"
 	"github.com/sirupsen/logrus"
 )
 
@@ -47,10 +47,6 @@ type AzblobUploader struct {
 }
 
 func NewUploader(c *AzblobConfig, l *logrus.Entry) (*AzblobUploader, error) {
-	// Create a ContainerURL object that wraps the container URL and a request
-	// pipeline to make requests.
-	p := azblob.NewPipeline(c.Credential, azblob.PipelineOptions{})
-
 	checkInterval := c.BatchWait / 10
 	if checkInterval < MinCheckInterval {
 		checkInterval = MinCheckInterval
@@ -59,7 +55,7 @@ func NewUploader(c *AzblobConfig, l *logrus.Entry) (*AzblobUploader, error) {
 	u := &AzblobUploader{
 		Entries:    make(chan Entry),
 		batches:    map[string]*Batch{},
-		container:  azblob.NewContainerURL(*c.ContainerURL, p),
+		container:  c.ContainerURL,
 		timeTicker: time.NewTicker(checkInterval),
 		quit:       make(chan struct{}),
 		config:     c,
@@ -169,7 +165,7 @@ func retry(attempts *uint64, f Func) error {
 		}
 
 		if attempts == nil || counter < *attempts {
-			counter += 1
+			counter++
 
 			// Add some randomness to prevent creating a Thundering Herd
 			jitter := time.Duration(rand.Int63n(int64(interval)))
