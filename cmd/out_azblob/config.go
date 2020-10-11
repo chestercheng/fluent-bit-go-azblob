@@ -29,8 +29,7 @@ const (
 )
 
 type AzblobConfig struct {
-	Credential          *azblob.SharedKeyCredential
-	ContainerURL        *url.URL
+	ContainerURL        azblob.ContainerURL
 	AutoCreateContainer bool
 	StoreAs             FileFormat
 	ObjectKeyFormat     string
@@ -47,18 +46,29 @@ func NewConfig(c PluginConfig) (*AzblobConfig, error) {
 
 	cfg := &AzblobConfig{}
 
-	cfg.Credential, err = azblob.NewSharedKeyCredential(
-		c.Get("Azure_Storage_Account"), c.Get("Azure_Storage_Access_Key"))
-	if err != nil {
-		return nil, fmt.Errorf("invalid credential: " + err.Error())
-	}
-
 	if c.Get("Azure_Container") == "" {
 		return nil, fmt.Errorf("cannot specify empty string to Azure_Container")
 	}
-	cfg.ContainerURL, _ = url.Parse(fmt.Sprintf(
-		"https://%s.blob.core.windows.net/%s",
-		c.Get("Azure_Storage_Account"), c.Get("Azure_Container")))
+
+	urlString := fmt.Sprintf("https://%s.blob.core.windows.net/%s", c.Get("Azure_Storage_Account"), c.Get("Azure_Container"))
+
+	var credential azblob.Credential
+	if c.Get("Azure_Storage_SAS") != "" {
+		credential = azblob.NewAnonymousCredential()
+		urlString = fmt.Sprintf("%s?%s", urlString, c.Get("Azure_Storage_SAS"))
+	} else {
+		credential, err = azblob.NewSharedKeyCredential(
+			c.Get("Azure_Storage_Account"), c.Get("Azure_Storage_Access_Key"))
+		if err != nil {
+			return nil, fmt.Errorf("invalid credential: " + err.Error())
+		}
+	}
+
+	URL, _ := url.Parse(urlString)
+	// Create a ContainerURL object that wraps the container URL and a request
+	// pipeline to make requests.
+	p := azblob.NewPipeline(credential, azblob.PipelineOptions{})
+	cfg.ContainerURL = azblob.NewContainerURL(*URL, p)
 
 	cfg.AutoCreateContainer, err = strconv.ParseBool(
 		c.Get("Auto_Create_Container"))

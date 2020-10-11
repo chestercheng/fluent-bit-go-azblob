@@ -9,7 +9,7 @@ import (
 
 	"code.cloudfoundry.org/bytefmt"
 	"github.com/fluent/fluent-bit-go/output"
-	"github.com/json-iterator/go"
+	jsoniter "github.com/json-iterator/go"
 	"github.com/sirupsen/logrus"
 )
 
@@ -106,7 +106,7 @@ func encodeJSON(record map[interface{}]interface{}) map[string]interface{} {
 //export FLBPluginRegister
 func FLBPluginRegister(ctx unsafe.Pointer) int {
 	return output.FLBPluginRegister(
-		ctx, "azblob", "Azure Blob Output plugin written in GO!")
+		ctx, "azblob", "Azure Blob Output plugin written in Go!")
 }
 
 //export FLBPluginInit

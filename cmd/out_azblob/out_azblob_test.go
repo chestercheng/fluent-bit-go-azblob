@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -17,14 +18,26 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-type mockConfig struct{}
+var testConf = map[string]string{
+	"Azure_Container":       "testContainer",
+	"Azure_Storage_Account": "testAccount",
+	"Azure_Storage_SAS":     "fluentSAS",
+}
+
+type mockConfig struct {
+	useSAS bool
+}
 
 func (mc mockConfig) Get(key string) string {
+	if mc.useSAS {
+		return testConf[key]
+	}
 	return os.Getenv(key)
 }
 
 func TestNewConfig(t *testing.T) {
-	cfg, err := NewConfig(&mockConfig{})
+	testCfg := &mockConfig{}
+	cfg, err := NewConfig(testCfg)
 	if err != nil {
 		assert.Fail(t, "NewConfig fails: %v", err)
 	}
@@ -37,6 +50,14 @@ func TestNewConfig(t *testing.T) {
 	assert.Equal(t, cfg.BatchWait, DefaultBatchWait)
 	assert.Equal(t, cfg.BatchLimitSize, uint64(DefaultBatchLimitSize))
 	assert.Equal(t, cfg.Location, time.UTC)
+	assert.False(t, strings.Contains(cfg.ContainerURL.String(), "fluentSAS"))
+
+	testCfg.useSAS = true
+	cfg, err = NewConfig(testCfg)
+	if err != nil {
+		assert.Fail(t, "NewConfig fails: %v", err)
+	}
+	assert.True(t, strings.Contains(cfg.ContainerURL.String(), "fluentSAS"))
 }
 
 func TestCreateJSON(t *testing.T) {

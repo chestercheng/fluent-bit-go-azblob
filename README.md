@@ -13,7 +13,7 @@ $ fluent-bit -e /path/to/built/out_azblob.so -c fluent-bit.conf
 
 ## Prerequisites
 
-* Go 1.14+
+* Go 1.15+
 * gcc (for cgo)
 * make
 
@@ -42,7 +42,8 @@ Add this section to fluent-bit.conf:
 | Key                                 | Description                                                                                                                                            | Default value                                    |
 |-------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------|--------------------------------------------------|
 | Azure_Storage_Account (Required)    | Your Azure Storage Account Name.                                                                                                                       | `""`                                             |
-| Azure_Storage_Access_Key (Required) | Your Azure Storage Access Key.                                                                                                                         | `""`                                             |
+| Azure_Storage_SAS (Required*)       | Your Azure Storage SAS Signature. Required if `Azure_Storage_Access_Key` is empty.                                                                     | `""`                                             |
+| Azure_Storage_Access_Key (Required*)| Your Azure Storage Access Key. Required if `Azure_Storage_SAS` is empty.                                                                               | `""`                                             |
 | Azure_Container (Required)          | Azure Storage Container name.                                                                                                                          | `""`                                             |
 | Auto_Create_Container               | Create container automatically.                                                                                                                        | `false`                                          |
 | Store_As                            | Archive format on Azure Storage. You can use following types: `text`/`gzip`                                                                            | `gzip`                                           |
